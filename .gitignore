@@ -1,2 +1,6 @@
 .venv/
 .python-version
+.env
+.DS_Store
+/__pycache__
+/lib
