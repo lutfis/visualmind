@@ -6,7 +6,7 @@ from pyvis.network import Network
 
 load_dotenv()
 
-with open("data/sample_input.txt", "r") as f:
+with open("data/sample_input_ch.txt", "r") as f:
     text = f.read().strip()
 
 client = ai.Client()
@@ -20,10 +20,22 @@ system_prompt = (
 )
 user_prompt = (
     f"""
-    Given the following text, list key entities as a JSON array of objects with
-    `name`, `type`, and `importance` (float 0-1). Use lowercase type labels
-    (e.g., \"person\", \"organization\"). Importance measures relevance.
-    Text:\n{text}\n\nJSON array:
+    Extract entities from the text and return ONLY a JSON array.
+    Each entity object must have:
+      - "name": string
+      - "type": one of ["person","organization","state"] (lowercase only)
+      - "importance": float in [0,1]
+
+    Rules:
+      - Include only these three types; exclude everything else (events, products, generic locations).
+      - "state" = sovereign country or subnational state/province; government bodies/agencies are "organization".
+      - No duplicates (deduplicate by canonical name).
+      - If none found, return [].
+
+    Text:
+    {text}
+
+    JSON array:
     """
 )
 messages = [
@@ -47,11 +59,30 @@ system_prompt = (
 )
 user_prompt = (
     f"""
-    Using the provided original text and the list of entities, output an array 
-    of relationship objects. Each object must contain `source`, `target`, 
-    `relation_type`, and `weight` (float 0-1). 
-    Only include relationships explicitly supported by the text.\n\n
-    Text:\n{text}\n\nEntities:\n{entities_str}\n\nJSON array:
+    Using the original text and the extracted entities, return ONLY a JSON array of relationship objects.
+    Each relationship object must have:
+      - "source": string (exactly matching an entity "name")
+      - "target": string (exactly matching an entity "name")
+      - "relationship": string
+      - "weight": float in [0,1]
+
+    Requirements:
+      - Each object must have exactly these keys: "source", "target", "relationship", "weight".
+      - "source" and "target" MUST be exact string matches of entity "name" values from the Entities list below. Do not invent, alias, or rename entities. Skip any relation that cannot be mapped to the given names.
+      - "relationship" is a short, lowercase label describing the link (e.g., "owner", "director", "founder", "advisor", "loaned money", "negotiated sale", "worked together", "acquired").
+      - "weight" is a float in [0,1] reflecting how important this connection is relative to the document's overall context. Consider the explicitness of the statement, centrality to the narrative, strength/frequency of evidence, and the entities' "importance" scores. Use higher weights for explicit, central ties; lower for weak or incidental mentions.
+      - Direction: If the text implies direction, set "source" as the actor/subject and "target" as the object/recipient (e.g., "A acquired B" -> source="A", target="B"). If direction is unclear, prefer the conventional direction for the verb; otherwise omit the relation.
+      - No duplicates. If the same (source, target, relationship) appears multiple times, include one object with the highest appropriate weight.
+      - Only include relationships explicitly supported by the text. If none, return [].
+      - Output MUST be valid JSON and nothing else.
+
+    Text:
+    {text}
+
+    Entities (use names exactly as provided):
+    {entities_str}
+
+    JSON array:
     """
 )
 messages = [
@@ -81,8 +112,8 @@ for relation in relationships:
     graph.add_edge(
         relation["source"],
         relation["target"],
-        weight=relation["weight"],
-        relation_type=relation["relation_type"]
+        width=relation["weight"],
+        title=relation["relationship"]
     )
 
 nt = Network(directed=True)
