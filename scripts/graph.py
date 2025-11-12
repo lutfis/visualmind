@@ -20,7 +20,7 @@ system_prompt = (
 )
 user_prompt = (
     f"""
-    Extract entities from the text and return ONLY a JSON array.
+    Extract the main entities from the text and return ONLY a JSON array.
     Each entity object must have:
       - "name": string
       - "type": one of ["person","organization","state"] (lowercase only)
@@ -34,6 +34,41 @@ user_prompt = (
 
     Text:
     {text}
+
+    JSON array:
+    """
+)
+messages = [
+    {"role": "system", "content": system_prompt},
+    {"role": "user", "content": user_prompt},
+]
+
+response = client.chat.completions.create(model="openai:gpt-5-mini-2025-08-07", messages=messages)
+
+print(response.choices[0].message.content)
+
+entities_str = response.choices[0].message.content
+entities = json.loads(entities_str)
+
+###########################
+
+system_prompt = (
+    """
+    You are an information assistant. Determine the synonyms in the given list.
+    Return ONLY valid JSON. No prose.
+    """
+)
+user_prompt = (
+    f"""
+    From json array of entities, determine the entities that are synonyms of each other given the context.
+    For examly, "Xi Jinping" and "China" refers to the same thing in the context of the text.
+    Merge such entities into one entity object with the JSON structure
+
+    Text:
+    {text}
+
+    Input JSON array:
+    {entities_str}
 
     JSON array:
     """
@@ -101,8 +136,8 @@ relationships = json.loads(relationships_str)
 graph = nx.DiGraph()
 for entity in entities:
     graph.add_node(
-        entity["name"],
-        type=entity["type"],
+        entity["canonical_name"],
+        type=entity["types"],
         value=entity["importance"],
     )
 for relation in relationships:
