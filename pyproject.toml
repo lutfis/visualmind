@@ -14,5 +14,6 @@ dependencies = [
     "numpy>=2.3.4",
     "nbformat>=5.10.4",
     "openai>=1.40.0",
-    "atomic-agents>=0.1",
+    "instructor>=1.12.0",
+    "matplotlib>=3.10.7",
 ]
